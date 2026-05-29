@@ -232,10 +232,9 @@ KONNECT_BASE_URL = env(
 KONNECT_RECEIVER_WALLET_ID = env("KONNECT_RECEIVER_WALLET_ID", default="")
 
 # ──────────────────────────────────────────
-# WhatsApp via Twilio
+# WhatsApp API Configuration (Meta Cloud API)
 # ──────────────────────────────────────────
-WHATSAPP_ENABLED     = True
-TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID", default="")
-TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN", default="")
-TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"
-SITE_URL             = "http://localhost:8000"
+WHATSAPP_ENABLED         = True
+WHATSAPP_API_TOKEN       = env("WHATSAPP_API_TOKEN", default="")
+WHATSAPP_PHONE_NUMBER_ID = env("WHATSAPP_PHONE_NUMBER_ID", default="")
+SITE_URL                 = "http://localhost:8000"

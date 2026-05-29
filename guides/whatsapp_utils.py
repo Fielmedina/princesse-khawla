@@ -31,55 +31,67 @@ def _normalize_phone(phone: str) -> str | None:
     return cleaned if cleaned else None
 
 
+import requests
+
+def send_whatsapp_message_cloud_api(to_phone: str, message: str) -> bool:
+    """
+    Envoie un message WhatsApp via l'API Cloud officielle de WhatsApp (Meta).
+    """
+    token = getattr(settings, "WHATSAPP_API_TOKEN", None)
+    phone_number_id = getattr(settings, "WHATSAPP_PHONE_NUMBER_ID", None)
+
+    if not all([token, phone_number_id]):
+        logger.warning("[WhatsApp API] Configuration WhatsApp Cloud API incomplète dans settings.py.")
+        return False
+
+    normalized = _normalize_phone(to_phone)
+    if not normalized:
+        logger.warning("[WhatsApp API] Numéro de téléphone invalide ou vide : %s", to_phone)
+        return False
+
+    # L'API Cloud WhatsApp requiert le numéro sans le signe '+' devant.
+    clean_phone = normalized.replace("+", "")
+
+    url = f"https://graph.facebook.com/v20.0/{phone_number_id}/messages"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": clean_phone,
+        "type": "text",
+        "text": {
+            "preview_url": False,
+            "body": message
+        }
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+        res_json = response.json()
+        if response.status_code == 200:
+            msg_id = res_json.get("messages", [{}])[0].get("id")
+            logger.info("[WhatsApp API] Message envoyé à %s — ID : %s", clean_phone, msg_id)
+            return True
+        else:
+            logger.error("[WhatsApp API] Échec de l'envoi à %s : %s", clean_phone, res_json)
+            return False
+    except Exception as exc:
+        logger.error("[WhatsApp API] Erreur lors de l'envoi à %s : %s", clean_phone, exc)
+        return False
+
+
 def send_whatsapp_message(to_phone: str, message: str) -> bool:
     """
-    Envoie un message WhatsApp via Twilio.
-
-    Prérequis dans settings.py :
-        TWILIO_ACCOUNT_SID  = "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-        TWILIO_AUTH_TOKEN   = "your_auth_token"
-        TWILIO_WHATSAPP_FROM = "whatsapp:+14155238886"   # sandbox Twilio
-        WHATSAPP_ENABLED    = True   # mettre False pour désactiver sans toucher le code
-
-    Retourne True si l'envoi a réussi, False sinon.
+    Envoie un message WhatsApp via l'API Cloud officielle de WhatsApp (Meta).
     """
     if not getattr(settings, "WHATSAPP_ENABLED", False):
         logger.info("[WhatsApp] Désactivé (WHATSAPP_ENABLED=False). Message non envoyé.")
         return False
 
-    account_sid  = getattr(settings, "TWILIO_ACCOUNT_SID",   None)
-    auth_token   = getattr(settings, "TWILIO_AUTH_TOKEN",    None)
-    from_number  = getattr(settings, "TWILIO_WHATSAPP_FROM", None)
-
-    if not all([account_sid, auth_token, from_number]):
-        logger.warning("[WhatsApp] Configuration Twilio incomplète. Vérifiez TWILIO_* dans settings.py.")
-        return False
-
-    normalized = _normalize_phone(to_phone)
-    if not normalized:
-        logger.warning("[WhatsApp] Numéro invalide ou vide : %s", to_phone)
-        return False
-
-    to_whatsapp = f"whatsapp:{normalized}"
-
-    try:
-        from twilio.rest import Client
-        client = Client(account_sid, auth_token)
-        msg = client.messages.create(
-            body=message,
-            from_=from_number,
-            to=to_whatsapp,
-        )
-        logger.info("[WhatsApp] Message envoyé à %s — SID : %s", to_whatsapp, msg.sid)
-        return True
-
-    except ImportError:
-        logger.error("[WhatsApp] twilio n'est pas installé. Lancez : pip install twilio")
-        return False
-
-    except Exception as exc:  # noqa: BLE001
-        logger.error("[WhatsApp] Échec de l'envoi à %s : %s", to_whatsapp, exc)
-        return False
+    return send_whatsapp_message_cloud_api(to_phone, message)
 
 
 def send_new_suggestion_whatsapp(guide, suggestion) -> bool:
